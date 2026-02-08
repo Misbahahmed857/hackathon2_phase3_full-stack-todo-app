@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: Chat API for Conversation State & Full-Stack Integration
+  description: API for managing chat conversations with AI integration
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+    description: Production server
+paths:
+  /api/{user_id}/chat:
+    post:
+      summary: Send a message and get AI response
+      description: Sends a user message and returns AI-generated response with optional MCP tool calls
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user sending the message
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Successful response with AI message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Bad request - Invalid input parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: object
+          required:
+            - content
+          properties:
+            content:
+              type: string
+              description: Content of the message
+              example: "Hello, how can you help me today?"
+            role:
+              type: string
+              description: Role of the message sender
+              enum: [user, assistant, system]
+              default: user
+        conversation_id:
+          type: string
+          description: ID of the conversation (creates new if not provided)
+          example: "123e4567-e89b-12d3-a456-426614174000"
+    ChatResponse:
+      type: object
+      required:
+        - success
+        - message
+        - conversation_id
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the request was successful
+          example: true
+        message:
+          $ref: '#/components/schemas/Message'
+        conversation_id:
+          type: string
+          description: ID of the conversation
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolCall'
+    Message:
+      type: object
+      required:
+        - id
+        - content
+        - role
+        - timestamp
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the message
+          example: "123e4567-e89b-12d3-a456-426614174001"
+        content:
+          type: string
+          description: Content of the message
+          example: "Hello! How can I assist you today?"
+        role:
+          type: string
+          description: Role of the message sender
+          enum: [user, assistant, system]
+        timestamp:
+          type: string
+          format: date-time
+          description: When the message was created
+          example: "2023-01-01T12:00:00Z"
+        type:
+          type: string
+          description: Type of the message
+          enum: [text, tool_call, tool_response]
+    ToolCall:
+      type: object
+      required:
+        - name
+        - arguments
+      properties:
+        name:
+          type: string
+          description: Name of the tool to call
+          example: "add_task"
+        arguments:
+          type: object
+          description: Arguments for the tool call
+          example: {"title": "New task", "description": "Task description"}
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid authentication token"
+        code:
+          type: string
+          description: Error code
+          example: "AUTH_001"
+        details:
+          type: object
+          description: Additional error details (optional)
+          example: {"token_expired": true}

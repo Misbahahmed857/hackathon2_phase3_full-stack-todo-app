@@ -1,210 +1,235 @@
-# Claude Code Rules
+# CLAUDE.md
 
-This file is generated during init for the selected agent.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
+## Project Overview
 
-## Task context
+This is Hackathon III - an AI-powered conversational chatbot for task management built using Spec-Driven Development (SDD). The application transforms a traditional Todo app into a conversational interface using Model Context Protocol (MCP) and OpenAI Agents SDK.
 
-**Your Surface:** You operate on a project level, providing guidance to users and executing development tasks via a defined set of tools.
+**Architecture**: Stateless FastAPI backend + Next.js frontend with Better Auth authentication.
 
-**Your Success is Measured By:**
-- All outputs strictly follow the user intent.
-- Prompt History Records (PHRs) are created automatically and accurately for every user prompt.
-- Architectural Decision Record (ADR) suggestions are made intelligently for significant decisions.
-- All changes are small, testable, and reference code precisely.
+## Tech Stack
 
-## Core Guarantees (Product Promise)
+- **Backend**: Python 3.11, FastAPI, SQLModel ORM
+- **Frontend**: Next.js 14.2.0, React 18, TailwindCSS, Better Auth
+- **AI/Agent**: OpenAI Agents SDK, OpenRouter API
+- **MCP**: Model Context Protocol SDK for tool definitions
+- **Database**: Neon Serverless PostgreSQL (SQLite for development)
+- **Testing**: pytest, pytest-asyncio
 
-- Record every user input verbatim in a Prompt History Record (PHR) after every user message. Do not truncate; preserve full multiline input.
-- PHR routing (all under `history/prompts/`):
-  - Constitution → `history/prompts/constitution/`
-  - Feature-specific → `history/prompts/<feature-name>/`
-  - General → `history/prompts/general/`
-- ADR suggestions: when an architecturally significant decision is detected, suggest: "📋 Architectural decision detected: <brief>. Document? Run `/sp.adr <title>`." Never auto‑create ADRs; require user consent.
+## Development Commands
+
+### Backend Setup
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Create .env file with required variables:
+# DATABASE_URL=sqlite:///./test.db
+# BETTER_AUTH_SECRET=your-secret-key
+# OPENROUTER_API_KEY=your-openrouter-key
+
+# Run backend server
+uvicorn src.main:app --reload --port 8000
+```
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev  # Runs on http://localhost:3000
+```
+
+### Testing
+```bash
+cd backend
+
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/unit/test_ai_agent.py
+
+# Run with verbose output
+pytest -v
+
+# Run integration tests
+pytest tests/integration/
+
+# Run e2e tests
+pytest tests/e2e/
+```
+
+## Code Architecture
+
+### Backend Structure
+
+**Core Layers**:
+1. **API Layer** (`backend/src/api/v1/`): FastAPI routers for auth, tasks, chat endpoints
+2. **Agent Layer** (`backend/src/agents/`): AI agent logic using OpenAI SDK
+   - `ai_agent.py`: Main conversational agent that processes natural language
+   - `intent_classifier.py`: Classifies user intent (CREATE_TASK, LIST_TASKS, etc.)
+3. **MCP Server** (`backend/src/mcp_server/`): Stateless tools for task operations
+   - `tools/`: Individual tool implementations (add_task, list_tasks, complete_task, etc.)
+   - `server.py`: MCP server FastAPI app exposing tool endpoints
+4. **Services** (`backend/src/services/`): Business logic for auth, tasks, chat, conversations
+5. **Models** (`backend/src/models/`): SQLModel database models (User, Task, Conversation, Message)
+
+**Key Architectural Constraints**:
+- **Stateless Design**: All state persists in database; no in-memory state
+- **MCP Tool Pattern**: AI agent ONLY interacts with data via MCP tools, never direct database access
+- **User Isolation**: All operations scoped to authenticated user_id
+- **Tool Registry**: `backend/src/mcp_tools/tool_registry.py` manages tool definitions and execution
+
+### Frontend Structure
+
+**Next.js App Router** (`frontend/src/app/`):
+- `/login` and `/register`: Authentication pages using Better Auth
+- `/dashboard`: Traditional task management UI
+- `/chat`: Conversational AI chatbot interface using ChatKit component
+
+**Components** (`frontend/src/components/`):
+- `ChatKit.jsx`: Main chat interface for conversational task management
+- `ProtectedRoute.jsx`: HOC for auth-protected routes
+- `TaskForm.jsx`, `TaskItem.jsx`: Traditional task UI components
+
+### Database Models
+
+All models inherit from SQLModel and include automatic timestamps:
+- **User**: id, username, email, hashed_password
+- **Task**: id, title, description, completed, user_id, created_at, updated_at, due_date
+- **Conversation**: id, user_id, title, created_at, updated_at
+- **Message**: id, conversation_id, role (user/assistant), content, created_at
+
+### Authentication Flow
+
+1. Better Auth handles JWT token generation on frontend
+2. Backend validates JWT via `backend/src/api/deps.py:get_current_user()`
+3. `user_id` extracted from token and used for all database queries
+4. Protected routes require valid JWT in Authorization header
+
+## Spec-Driven Development Workflow
+
+This project uses Spec-Driven Development (SDD) methodology. All features MUST follow this workflow:
+
+### Mandatory Workflow Order
+1. **Specification** (`/sp.specify`): Write feature requirements
+2. **Plan** (`/sp.plan`): Generate architectural design
+3. **Tasks** (`/sp.tasks`): Create atomic, testable tasks
+4. **Implementation**: Execute via Claude Code (humans may NOT write application code)
+
+### Project Structure for SDD
+- `.specify/memory/constitution.md`: Project principles and rules (see below)
+- `specs/<feature>/spec.md`: Feature requirements
+- `specs/<feature>/plan.md`: Architecture decisions
+- `specs/<feature>/tasks.md`: Testable implementation tasks
+- `history/prompts/`: Prompt History Records (PHRs)
+- `history/adr/`: Architecture Decision Records (ADRs)
+
+### Key SDD Principles from Constitution
+
+**Stateless Architecture** (CRITICAL):
+- FastAPI and MCP tools must be fully stateless
+- All state persists in Neon PostgreSQL via SQLModel
+- Server restarts must not affect conversations
+
+**MCP Compliance**:
+- AI agents may ONLY interact via MCP tools
+- No direct database access from agents
+- Tools must validate inputs and enforce user ownership
+
+**User Isolation**:
+- Every operation scoped to authenticated `user_id`
+- Cross-user access is a critical security failure
+
+**Feature Scope** (Basic Level Only):
+- Conversational task CRUD operations
+- Conversation history persistence
+- NO advanced analytics, voice, or external integrations
+
+### Prompt History Records (PHRs)
+
+After implementation work, create PHRs to document user interactions:
+- Location: `history/prompts/constitution/`, `history/prompts/<feature-name>/`, or `history/prompts/general/`
+- Template: `.specify/templates/phr-template.prompt.md`
+- Stages: constitution | spec | plan | tasks | red | green | refactor | explainer | misc | general
+
+### Architecture Decision Records (ADRs)
+
+For architecturally significant decisions, suggest (but don't auto-create):
+```
+📋 Architectural decision detected: <brief>
+   Document reasoning and tradeoffs? Run `/sp.adr <decision-title>`
+```
+
+Test for ADR significance:
+- **Impact**: Long-term consequences (framework, data model, API, security)?
+- **Alternatives**: Multiple viable options considered?
+- **Scope**: Cross-cutting, influences system design?
+
+If ALL true, suggest ADR creation and wait for user consent.
+
+## Environment Variables
+
+### Backend (.env)
+```
+DATABASE_URL=sqlite:///./test.db  # Or PostgreSQL connection string
+BETTER_AUTH_SECRET=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+OPENROUTER_API_KEY=your-openrouter-api-key
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+ALLOWED_ORIGINS=http://localhost:3000,*
+```
+
+### Frontend (.env.local)
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+BETTER_AUTH_SECRET=same-secret-as-backend
+```
 
 ## Development Guidelines
 
-### 1. Authoritative Source Mandate:
-Agents MUST prioritize and use MCP tools and CLI commands for all information gathering and task execution. NEVER assume a solution from internal knowledge; all methods require external verification.
+### When Working on Features
+1. **Read the Constitution**: Check `.specify/memory/constitution.md` for mandatory constraints
+2. **Check Existing Specs**: Review `specs/<feature>/` to understand implemented features
+3. **Follow SDD Workflow**: Never implement without spec → plan → tasks
+4. **Use MCP Tools**: For AI agent work, always use tool registry pattern
+5. **Test Thoroughly**: Add unit tests (`tests/unit/`), integration tests (`tests/integration/`), and e2e tests (`tests/e2e/`)
 
-### 2. Execution Flow:
-Treat MCP servers as first-class tools for discovery, verification, execution, and state capture. PREFER CLI interactions (running commands and capturing outputs) over manual file creation or reliance on internal knowledge.
+### Code References
+When discussing code, use format `file_path:line_number` for precise references:
+```
+The agent processes requests in backend/src/agents/ai_agent.py:73
+```
 
-### 3. Knowledge capture (PHR) for Every User Input.
-After completing requests, you **MUST** create a PHR (Prompt History Record).
+### Working with MCP Tools
+1. Tool definitions: `backend/src/mcp_server/tools/tool_schemas.py`
+2. Tool implementations: `backend/src/mcp_server/tools/<tool_name>_tool.py`
+3. Register tools: `backend/src/mcp_tools/tool_registry.py`
+4. Agent invokes tools via registry, NOT direct database access
 
-**When to create PHRs:**
-- Implementation work (code changes, new features)
-- Planning/architecture discussions
-- Debugging sessions
-- Spec/task/plan creation
-- Multi-step workflows
+### Testing Strategy
+- **Unit tests**: Individual MCP tools and agent functions
+- **Integration tests**: API endpoints, database interactions, tool execution
+- **E2E tests**: Full conversation flows with chat endpoint
 
-**PHR Creation Process:**
+## Common Pitfalls to Avoid
 
-1) Detect stage
-   - One of: constitution | spec | plan | tasks | red | green | refactor | explainer | misc | general
+1. **Breaking Statelessness**: Never store conversation state in memory or module-level variables
+2. **Direct DB Access from Agent**: Always use MCP tools for data operations
+3. **Skipping SDD Workflow**: Do not implement features without spec/plan/tasks
+4. **Cross-User Data Leaks**: Always filter queries by authenticated user_id
+5. **Hardcoded Secrets**: Use .env files, never commit secrets
 
-2) Generate title
-   - 3–7 words; create a slug for the filename.
+## Current Active Feature
 
-2a) Resolve route (all under history/prompts/)
-  - `constitution` → `history/prompts/constitution/`
-  - Feature stages (spec, plan, tasks, red, green, refactor, explainer, misc) → `history/prompts/<feature-name>/` (requires feature context)
-  - `general` → `history/prompts/general/`
+Branch: `004-ai-agent-behavior`
+- Python 3.11 + OpenAI Agents SDK
+- Model Context Protocol (MCP) SDK
+- FastAPI integration
+- Neon Serverless PostgreSQL (via SQLModel ORM)
 
-3) Prefer agent‑native flow (no shell)
-   - Read the PHR template from one of:
-     - `.specify/templates/phr-template.prompt.md`
-     - `templates/phr-template.prompt.md`
-   - Allocate an ID (increment; on collision, increment again).
-   - Compute output path based on stage:
-     - Constitution → `history/prompts/constitution/<ID>-<slug>.constitution.prompt.md`
-     - Feature → `history/prompts/<feature-name>/<ID>-<slug>.<stage>.prompt.md`
-     - General → `history/prompts/general/<ID>-<slug>.general.prompt.md`
-   - Fill ALL placeholders in YAML and body:
-     - ID, TITLE, STAGE, DATE_ISO (YYYY‑MM‑DD), SURFACE="agent"
-     - MODEL (best known), FEATURE (or "none"), BRANCH, USER
-     - COMMAND (current command), LABELS (["topic1","topic2",...])
-     - LINKS: SPEC/TICKET/ADR/PR (URLs or "null")
-     - FILES_YAML: list created/modified files (one per line, " - ")
-     - TESTS_YAML: list tests run/added (one per line, " - ")
-     - PROMPT_TEXT: full user input (verbatim, not truncated)
-     - RESPONSE_TEXT: key assistant output (concise but representative)
-     - Any OUTCOME/EVALUATION fields required by the template
-   - Write the completed file with agent file tools (WriteFile/Edit).
-   - Confirm absolute path in output.
-
-4) Use sp.phr command file if present
-   - If `.**/commands/sp.phr.*` exists, follow its structure.
-   - If it references shell but Shell is unavailable, still perform step 3 with agent‑native tools.
-
-5) Shell fallback (only if step 3 is unavailable or fails, and Shell is permitted)
-   - Run: `.specify/scripts/bash/create-phr.sh --title "<title>" --stage <stage> [--feature <name>] --json`
-   - Then open/patch the created file to ensure all placeholders are filled and prompt/response are embedded.
-
-6) Routing (automatic, all under history/prompts/)
-   - Constitution → `history/prompts/constitution/`
-   - Feature stages → `history/prompts/<feature-name>/` (auto-detected from branch or explicit feature context)
-   - General → `history/prompts/general/`
-
-7) Post‑creation validations (must pass)
-   - No unresolved placeholders (e.g., `{{THIS}}`, `[THAT]`).
-   - Title, stage, and dates match front‑matter.
-   - PROMPT_TEXT is complete (not truncated).
-   - File exists at the expected path and is readable.
-   - Path matches route.
-
-8) Report
-   - Print: ID, path, stage, title.
-   - On any failure: warn but do not block the main command.
-   - Skip PHR only for `/sp.phr` itself.
-
-### 4. Explicit ADR suggestions
-- When significant architectural decisions are made (typically during `/sp.plan` and sometimes `/sp.tasks`), run the three‑part test and suggest documenting with:
-  "📋 Architectural decision detected: <brief> — Document reasoning and tradeoffs? Run `/sp.adr <decision-title>`"
-- Wait for user consent; never auto‑create the ADR.
-
-### 5. Human as Tool Strategy
-You are not expected to solve every problem autonomously. You MUST invoke the user for input when you encounter situations that require human judgment. Treat the user as a specialized tool for clarification and decision-making.
-
-**Invocation Triggers:**
-1.  **Ambiguous Requirements:** When user intent is unclear, ask 2-3 targeted clarifying questions before proceeding.
-2.  **Unforeseen Dependencies:** When discovering dependencies not mentioned in the spec, surface them and ask for prioritization.
-3.  **Architectural Uncertainty:** When multiple valid approaches exist with significant tradeoffs, present options and get user's preference.
-4.  **Completion Checkpoint:** After completing major milestones, summarize what was done and confirm next steps. 
-
-## Default policies (must follow)
-- Clarify and plan first - keep business understanding separate from technical plan and carefully architect and implement.
-- Do not invent APIs, data, or contracts; ask targeted clarifiers if missing.
-- Never hardcode secrets or tokens; use `.env` and docs.
-- Prefer the smallest viable diff; do not refactor unrelated code.
-- Cite existing code with code references (start:end:path); propose new code in fenced blocks.
-- Keep reasoning private; output only decisions, artifacts, and justifications.
-
-### Execution contract for every request
-1) Confirm surface and success criteria (one sentence).
-2) List constraints, invariants, non‑goals.
-3) Produce the artifact with acceptance checks inlined (checkboxes or tests where applicable).
-4) Add follow‑ups and risks (max 3 bullets).
-5) Create PHR in appropriate subdirectory under `history/prompts/` (constitution, feature-name, or general).
-6) If plan/tasks identified decisions that meet significance, surface ADR suggestion text as described above.
-
-### Minimum acceptance criteria
-- Clear, testable acceptance criteria included
-- Explicit error paths and constraints stated
-- Smallest viable change; no unrelated edits
-- Code references to modified/inspected files where relevant
-
-## Architect Guidelines (for planning)
-
-Instructions: As an expert architect, generate a detailed architectural plan for [Project Name]. Address each of the following thoroughly.
-
-1. Scope and Dependencies:
-   - In Scope: boundaries and key features.
-   - Out of Scope: explicitly excluded items.
-   - External Dependencies: systems/services/teams and ownership.
-
-2. Key Decisions and Rationale:
-   - Options Considered, Trade-offs, Rationale.
-   - Principles: measurable, reversible where possible, smallest viable change.
-
-3. Interfaces and API Contracts:
-   - Public APIs: Inputs, Outputs, Errors.
-   - Versioning Strategy.
-   - Idempotency, Timeouts, Retries.
-   - Error Taxonomy with status codes.
-
-4. Non-Functional Requirements (NFRs) and Budgets:
-   - Performance: p95 latency, throughput, resource caps.
-   - Reliability: SLOs, error budgets, degradation strategy.
-   - Security: AuthN/AuthZ, data handling, secrets, auditing.
-   - Cost: unit economics.
-
-5. Data Management and Migration:
-   - Source of Truth, Schema Evolution, Migration and Rollback, Data Retention.
-
-6. Operational Readiness:
-   - Observability: logs, metrics, traces.
-   - Alerting: thresholds and on-call owners.
-   - Runbooks for common tasks.
-   - Deployment and Rollback strategies.
-   - Feature Flags and compatibility.
-
-7. Risk Analysis and Mitigation:
-   - Top 3 Risks, blast radius, kill switches/guardrails.
-
-8. Evaluation and Validation:
-   - Definition of Done (tests, scans).
-   - Output Validation for format/requirements/safety.
-
-9. Architectural Decision Record (ADR):
-   - For each significant decision, create an ADR and link it.
-
-### Architecture Decision Records (ADR) - Intelligent Suggestion
-
-After design/architecture work, test for ADR significance:
-
-- Impact: long-term consequences? (e.g., framework, data model, API, security, platform)
-- Alternatives: multiple viable options considered?
-- Scope: cross‑cutting and influences system design?
-
-If ALL true, suggest:
-📋 Architectural decision detected: [brief-description]
-   Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
-
-Wait for consent; never auto-create ADRs. Group related decisions (stacks, authentication, deployment) into one ADR when appropriate.
-
-## Basic Project Structure
-
-- `.specify/memory/constitution.md` — Project principles
-- `specs/<feature>/spec.md` — Feature requirements
-- `specs/<feature>/plan.md` — Architecture decisions
-- `specs/<feature>/tasks.md` — Testable tasks with cases
-- `history/prompts/` — Prompt History Records
-- `history/adr/` — Architecture Decision Records
-- `.specify/` — SpecKit Plus templates and scripts
-
-## Code Standards
-See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+See `specs/004-ai-agent-behavior/` for full specification and implementation details.

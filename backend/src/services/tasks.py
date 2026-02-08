@@ -6,8 +6,12 @@ from fastapi import HTTPException, status
 
 def create_task(*, session: Session, task: TaskCreate, user_id: str) -> TaskRead:
     """Create a new task for the authenticated user"""
-    db_task = Task.model_validate(task.model_dump())
-    db_task.user_id = user_id
+    db_task = Task(
+        title=task.title,
+        description=task.description,
+        is_completed=task.is_completed,
+        user_id=user_id
+    )
 
     session.add(db_task)
     session.commit()

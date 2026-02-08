@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install only essential system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only the requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code (this will happen during container startup in dev mode)
+# For now, we'll create a minimal app to verify the image works
+RUN mkdir -p src && \
+    echo "from fastapi import FastAPI" > src/main.py && \
+    echo "app = FastAPI()" >> src/main.py && \
+    echo "" >> src/main.py && \
+    echo "@app.get('/')" >> src/main.py && \
+    echo "def read_root():" >> src/main.py && \
+    echo "    return {'Hello': 'World'}" >> src/main.py
+
+EXPOSE 8000
+
+CMD ["uvicorn", "src/main:app", "--host", "0.0.0.0", "--port", "8000"]

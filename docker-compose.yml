@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hackathon-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./test.db
+      - ENVIRONMENT=development
+    depends_on:
+      - db
+    networks:
+      - app-network
+    # Restart policy to handle potential startup issues
+    restart: unless-stopped
+
+  frontend:
+    image: hackathon-frontend
+    container_name: hackathon-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    # Restart policy to handle potential startup issues
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: hackathon-db
+    restart: always
+    environment:
+      POSTGRES_DB: hackathon_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  backend_data:
+
+networks:
+  app-network:
+    driver: bridge

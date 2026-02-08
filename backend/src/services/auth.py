@@ -6,16 +6,24 @@ from jose import JWTError, jwt
 from src.models.user import User
 from src.settings import settings
 from src.database import engine
+import hashlib
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Initialize with only pbkdf2 to avoid bcrypt compatibility issues
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    # Handle bcrypt length limitation by truncating before comparison
+    if len(plain_password.encode('utf-8')) > 72:
+        plain_password = plain_password[:72]
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
+    # Handle bcrypt length limitation by truncating before hashing
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
     return pwd_context.hash(password)
 
 

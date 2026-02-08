@@ -20,8 +20,12 @@ def register(user: UserRegistration):
                 detail="Email already registered"
             )
 
-        # Hash the password
-        hashed_password = get_password_hash(user.password)
+        # Hash the password, ensuring it doesn't exceed bcrypt's 72-character limit
+        password = user.password
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]  # Truncate to 72 characters to avoid bcrypt limitation
+
+        hashed_password = get_password_hash(password)
 
         # Create new user
         db_user = User(email=user.email, hashed_password=hashed_password)
@@ -35,7 +39,12 @@ def register(user: UserRegistration):
 @router.post("/login", response_model=TokenResponse)
 def login(user_credentials: UserLogin):
     with Session(engine) as session:
-        user = authenticate_user(session, user_credentials.email, user_credentials.password)
+        # Handle bcrypt password length limitation for login
+        password = user_credentials.password
+        if len(password.encode('utf-8')) > 72:
+            password = password[:72]  # Truncate to 72 characters to avoid bcrypt limitation
+
+        user = authenticate_user(session, user_credentials.email, password)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

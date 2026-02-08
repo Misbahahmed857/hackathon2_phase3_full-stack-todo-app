@@ -1,0 +1,32 @@
+1. Get the application URLs by running these commands:
+
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ if $.Values.ingress.path }}{{ $.Values.ingress.path }}{{ end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.frontend.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "todo-chatbot.fullname" . }}-frontend)
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.frontend.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "todo-chatbot.fullname" . }}-frontend'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "todo-chatbot.fullname" . }}-frontend --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.frontend.service.port }}
+{{- else if contains "ClusterIP" .Values.frontend.service.type }}
+  echo "Frontend: http://{{ include "todo-chatbot.fullname" . }}-frontend:{{ .Values.frontend.service.port }}"
+  echo "Backend: http://{{ include "todo-chatbot.fullname" . }}-backend:{{ .Values.backend.service.port }}"
+  
+  # To access the services locally, run port forwarding:
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "todo-chatbot.fullname" . }}-frontend {{ .Values.frontend.service.port }}:{{ .Values.frontend.service.port }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "todo-chatbot.fullname" . }}-backend {{ .Values.backend.service.port }}:{{ .Values.backend.service.port }}
+{{- end }}
+
+2. To check the status of pods:
+  kubectl get pods --namespace {{ .Release.Namespace }}
+
+3. To view logs of the frontend:
+  kubectl logs --namespace {{ .Release.Namespace }} -l app.kubernetes.io/component=frontend
+
+4. To view logs of the backend:
+  kubectl logs --namespace {{ .Release.Namespace }} -l app.kubernetes.io/component=backend

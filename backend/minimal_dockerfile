@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install only essential system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install only the most essential packages
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir fastapi==0.104.1 uvicorn==0.24.0
+
+# Create a minimal app to test
+RUN mkdir -p src && \
+    echo "from fastapi import FastAPI" > src/main.py && \
+    echo "app = FastAPI()" >> src/main.py && \
+    echo "" >> src/main.py && \
+    echo "@app.get('/')" >> src/main.py && \
+    echo "def read_root():" >> src/main.py && \
+    echo "    return {'Hello': 'Backend is running'}" >> src/main.py && \
+    echo "" >> src/main.py && \
+    echo "@app.get('/health')" >> src/main.py && \
+    echo "def health_check():" >> src/main.py && \
+    echo "    return {'status': 'healthy'}" >> src/main.py
+
+EXPOSE 8000
+
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

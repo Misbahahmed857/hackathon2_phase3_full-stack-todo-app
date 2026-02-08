@@ -1,36 +1,17 @@
 'use client';
 
-import React from 'react';
-import { useAuth } from './AuthProvider/AuthProvider';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+export default function ProtectedRoute({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/login'); // Redirect to login if not authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
     }
-  }, [isAuthenticated, loading, router]);
+  }, [router]);
 
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  // If authenticated, render the protected content
-  if (isAuthenticated) {
-    return children;
-  }
-
-  // If not authenticated and not loading, return nothing or a redirect message
-  return null;
-};
-
-export default ProtectedRoute;
+  return <>{children}</>;
+}
